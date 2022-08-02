@@ -1,5 +1,6 @@
 ﻿using System.CommandLine;
 using System.Containers;
+using System.Text.Json;
 
 var fileOption = new Argument<DirectoryInfo>(
     name: "folder",
@@ -68,6 +69,11 @@ async Task Containerize(DirectoryInfo folder, string workingDir, string registry
     Image x = await registry.GetImageManifest(baseName, baseTag);
     x.WorkingDirectory = workingDir;
 
+    JsonSerializerOptions options = new()
+    {
+        WriteIndented = true,
+    };
+
     Console.WriteLine($"Copying from {folder.FullName} to {workingDir}");
     Layer l = Layer.FromDirectory(folder.FullName, workingDir);
 
@@ -75,6 +81,16 @@ async Task Containerize(DirectoryInfo folder, string workingDir, string registry
 
     x.SetEntrypoint(entrypoint);
 
+    // File.WriteAllTextAsync("manifest.json", x.manifest.ToJsonString(options));
+    // File.WriteAllTextAsync("config.json", x.config.ToJsonString(options));
+
+    await LocalDocker.Load(x, imageName, baseName);
+
+    Console.WriteLine($"Loaded image into local Docker daemon. Use 'docker run --rm -it --name {imageName} {registryName}/{imageName}:latest' to run the application.");
+}
+
+static async Task PushToLocalDockerViaRegistry(string registryName, string baseName, string imageName, Registry registry, Image x)
+{
     // Push the image back to the local registry
 
     await registry.Push(x, imageName, baseName);
@@ -83,7 +99,4 @@ async Task Containerize(DirectoryInfo folder, string workingDir, string registry
 
     var pullBase = System.Diagnostics.Process.Start("docker", $"pull {registryName}/{imageName}:latest");
     await pullBase.WaitForExitAsync();
-
-    Console.WriteLine($"Loaded image into local Docker daemon. Use 'docker run --rm -it --name {imageName} {registryName}/{imageName}:latest' to run the application.");
-
 }

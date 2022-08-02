@@ -30,14 +30,10 @@ public record struct Layer
 
     public static Layer FromFiles(IEnumerable<(string path, string containerPath)> fileList)
     {
-        string tempPath = Path.Join(Configuration.ArtifactRoot, "Temp");
-
-        Directory.CreateDirectory(tempPath);
-
         long fileSize;
         byte[] hash;
 
-        string tempTarballPath = Path.Join(tempPath, Path.GetRandomFileName());
+        string tempTarballPath = Configuration.GetTempFile();
         using (FileStream fs = File.Create(tempTarballPath))
         {
             // using (GZipStream gz = new(fs, CompressionMode.Compress)) // TODO: https://github.com/rainersigwald/containers/issues/29
@@ -63,7 +59,14 @@ public record struct Layer
 
         string contentHash = Convert.ToHexString(hash).ToLowerInvariant();
 
-        string storedContent = Path.Combine(Configuration.ContentRoot, contentHash);
+        Descriptor descriptor = new()
+        {
+            MediaType = "application/vnd.docker.image.rootfs.diff.tar", // TODO: configurable? gzip always?
+            Size = fileSize,
+            Digest = $"sha256:{contentHash}"
+        };
+
+        string storedContent = Configuration.PathForDescriptor(descriptor);
 
         Directory.CreateDirectory(Configuration.ContentRoot);
 
@@ -71,12 +74,7 @@ public record struct Layer
 
         Layer l = new()
         {
-            Descriptor = new()
-            {
-                MediaType = "application/vnd.docker.image.rootfs.diff.tar", // TODO: configurable? gzip always?
-                Size = fileSize,
-                Digest = $"sha256:{contentHash}"
-            },
+            Descriptor = descriptor,
             BackingFile = storedContent,
         };
 

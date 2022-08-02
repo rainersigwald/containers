@@ -7,15 +7,18 @@ namespace System.Containers;
 
 public class Image
 {
-    internal JsonNode manifest;
-    internal JsonNode config;
+    public JsonNode manifest;
+    public JsonNode config;
+
+    internal readonly Registry? originatingRegistry;
 
     internal List<Layer> newLayers = new();
 
-    public Image(JsonNode manifest, JsonNode config)
+    public Image(JsonNode manifest, JsonNode config, Registry? registry)
     {
         this.manifest = manifest;
         this.config = config;
+        this.originatingRegistry = registry;
     }
 
     public void AddLayer(Layer l)
@@ -27,7 +30,7 @@ public class Image
     }
 
     private void RecalculateDigest() {
-        manifest["config"]!["digest"] = GetSha(config);
+        manifest["config"]!["digest"] = GetDigest(config);
     }
 
     public void SetEntrypoint(string executable, string[]? args = null)
@@ -61,11 +64,20 @@ public class Image
         }
     }
 
-    public string GetSha(JsonNode json)
+    public string GetDigest(JsonNode json)
+    {
+        string hashString;
+
+        hashString = GetSha(json);
+
+        return $"sha256:{hashString}";
+    }
+
+    public static string GetSha(JsonNode json)
     {
         using SHA256 mySHA256 = SHA256.Create();
         byte[] hash = mySHA256.ComputeHash(Encoding.UTF8.GetBytes(json.ToJsonString()));
 
-        return $"sha256:{Convert.ToHexString(hash).ToLowerInvariant()}";
+        return Convert.ToHexString(hash).ToLowerInvariant();
     }
 }
