@@ -10,7 +10,7 @@ public class DockerRegistryManager
     public const string BaseImageTag = "6.0";
     public const string LocalRegistry = "localhost:5010";
 
-    private static string? s_registryContainerId;
+    private static string s_registryContainerId;
 
     [AssemblyInitialize]
     public static void StartAndPopulateDockerRegistry(TestContext context)
@@ -23,12 +23,12 @@ public class DockerRegistryManager
             RedirectStandardError = true,
         };
 
-        using Process? registryProcess = Process.Start(startRegistry);
+        using Process registryProcess = Process.Start(startRegistry);
         Assert.IsNotNull(registryProcess);
-        string? registryContainerId = registryProcess.StandardOutput.ReadLine();
+        string registryContainerId = registryProcess.StandardOutput.ReadLine();
         // debugging purposes
-        string? everythingElse = registryProcess.StandardOutput.ReadToEnd();
-        string? errStream = registryProcess.StandardError.ReadToEnd();
+        string everythingElse = registryProcess.StandardOutput.ReadToEnd();
+        string errStream = registryProcess.StandardError.ReadToEnd();
         Assert.IsNotNull(registryContainerId);
         registryProcess.WaitForExit();
         Assert.AreEqual(0, registryProcess.ExitCode);

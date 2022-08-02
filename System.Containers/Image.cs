@@ -47,7 +47,7 @@ public class Image
         }
         else
         {
-            configObject["Cmd"] = new JsonArray(args.Select(s =>(JsonObject)s).ToArray());
+            configObject["Cmd"] = new JsonArray(args.Where(s => !string.IsNullOrEmpty(s)).Select(s =>(JsonObject)s).ToArray());
         }
 
         RecalculateDigest();

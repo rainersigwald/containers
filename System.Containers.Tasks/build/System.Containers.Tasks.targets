@@ -6,43 +6,65 @@
     <!-- Required targets dependencies -->
     <PropertyGroup>
         <PublishContainerDependsOn>
-            Build;
             ComputeContainerConfig
         </PublishContainerDependsOn>
     </PropertyGroup>
-
-    <Target Name="ComputeContainerConfig" AfterTargets="Build;_CopyResolvedFilesToPublishPreserveNewest">
-        <!-- Find everything in the publish directory -->
-        <ItemGroup>
-            <_BuildOutputsNonRelative Include="$(MSBuildProjectDirectory)\$(PublishDir)**\*.*"/>
-            <BuildOutputs Include="%(_BuildOutputsNonRelative.FullPath)"/>
-        </ItemGroup>
+<!-- is this target influenced by file state or properties defined/modified by other targets. If so, you have a dependency -->
+    <Target Name="ComputeContainerConfig">
 
         <!-- Container Defaults -->
         <PropertyGroup>
-            <ContainerBaseImageName Condition="'$(ContainerBaseImageName)' == ''"></ContainerBaseImageName>
-            <ContainerBaseImageTag Condition="'$(ContainerBaseImageTag)' == '' and $([MSBuild]::VersionGreaterThanOrEquals('$(TargetFrameworkVersion)', 6.0))">6.0</ContainerBaseImageTag>
-            <ContainerBaseImage Condition="'$(ContainerBaseImage)' == ''">$(ContainerBaseImageName):$(ContainerBaseImageTag)</ContainerBaseImage>
-            <ContainerInputRegistryURL Condition="'$(ContainerInputRegistryURL)' == ''">http://localhost:5010</ContainerInputRegistryURL>
-            <ContainerOutputRegistryURL Condition="'$(ContainerOutputRegistryURL)' == ''">http://localhost:5010</ContainerOutputRegistryURL>
-            <ContainerImageName Condition="'$(ContainerImageName)' == ''">$(AssemblyName.ToLower())</ContainerImageName>
+            <_ContainerBaseImageName Condition="'$(_ContainerBaseImageName)' == '' and @(ProjectCapability->AnyHaveMetadataValue('Identity', 'AspNetCore'))">https://mcr.microsoft.com/dotnet/aspnet</_ContainerBaseImageName>
+            <_ContainerBaseImageName Condition="'$(_ContainerBaseImageName)' == ''">https://mcr.microsoft.com/dotnet/runtime</_ContainerBaseImageName>
+            <_ContainerBaseImageTag Condition="'$(_ContainerBaseImageTag)' == ''">$(_TargetFrameworkVersionWithoutV)</_ContainerBaseImageTag>
+            <ContainerBaseImage Condition="'$(ContainerBaseImage)' == ''">$(_ContainerBaseImageName):$(_ContainerBaseImageTag)</ContainerBaseImage>
+            <ContainerBaseRegistry Condition="'$(ContainerBaseRegistry)' == ''">docker://</ContainerBaseRegistry>
+            <!-- Note: spaces will be replaced with '-' in ContainerImageName and ContainerImageTag -->
+            <ContainerImageName Condition="'$(ContainerImageName)' == ''">$(AssemblyName)</ContainerImageName>
             <ContainerImageTag Condition="'$(ContainerImageTag)' == ''">$(Version)</ContainerImageTag>
             <ContainerWorkingDirectory Condition="'$(ContainerWorkingDirectory)' == ''">/app</ContainerWorkingDirectory>
-            <ContainerEntrypoint Condition="'$(ContainerEntrypoint)' == '' and '$(SelfContained)' != 'true'">dotnet $(TargetFileName)</ContainerEntrypoint>
-            <!-- https://gist.github.com/BenVillalobos/e5336491e683b87e7ec2a5322f58dfbe -->
-            <ContainerEntrypoint Condition="'$(ContainerEntrypoint)' == '' and '$(SelfContained)' == 'true'">$(ContainerWorkingDirectory)/$(AssemblyName)$(_NativeExecutableExtension)</ContainerEntrypoint>
+            <!-- TODO: Test this scenario -->
+            <ContainerEntrypoint Condition="'$(ContainerEntrypoint)' == '' and '$(UseAppHost)' != 'true'">dotnet $(TargetFileName)</ContainerEntrypoint>
+            <ContainerEntrypoint Condition="'$(ContainerEntrypoint)' == '' and '$(UseAppHost)' == 'true'">$(ContainerWorkingDirectory)/$(AssemblyName)$(_NativeExecutableExtension)</ContainerEntrypoint>
+            <!-- Could be semicolon-delimited -->
             <ContainerEntrypointArgs Condition="'$(ContainerEntrypointArgs)' == ''"></ContainerEntrypointArgs>
         </PropertyGroup>
-    </Target>
 
-    <Target Name="PublishContainer" DependsOnTargets="$(PublishContainerDependsOn)" BeforeTargets="Publish">
-        <CreateNewImage BaseImageName="$(ContainerBaseImageName)"
-                        BaseImageTag="$(ContainerBaseImageTag)"
-                        InputRegistryURL="$(ContainerInputRegistryURL)"
-                        OutputRegistryURL="$(ContainerOutputRegistryURL)"
+        <ItemGroup>
+            <ContainerLabel Condition="@(ContainerLabel) == ''"></ContainerLabel>
+        </ItemGroup>
+
+        <ItemGroup Condition="@(ProjectCapability->AnyHaveMetadataValue('Identity', 'AspNetCore'))">
+            <ContainerPort Include="80" Type="tcp" Condition="!@(ContainerPort->WithMetadataValue('Identity', '80')->AnyHaveMetadataValue('Type', 'tcp'))" />
+
+            <ContainerEnvironmentVariable Include="ASPNETCORE_URLS" Value="http://localhost:5000;https://localhost:5001"
+                                                                    Condition="@(ContainerEnvironmentVariable->AnyHaveMetadataValue('Identity', 'ASPNETCORE_URLS'))"/>
+        </ItemGroup>
+
+        <ParseContainerProperties FullyQualifiedBaseImageName="$(ContainerBaseImage)"
+                                  ContainerImageName="$(ContainerImageName)"
+                                  ContainerImageTag="$(ContainerImageTag)">
+
+            <Output TaskParameter="ParsedContainerRegistry" PropertyName="ContainerBaseRegistry" />
+            <Output TaskParameter="ParsedContainerImage" PropertyName="ContainerBaseName" />
+            <Output TaskParameter="ParsedContainerTag" PropertyName="ContainerBaseTag" />
+            <!-- To do: NewContainerRegistry -->
+            <Output TaskParameter="NewContainerImageName" PropertyName="ContainerImageName" />
+            <Output TaskParameter="NewContainerImageTag" PropertyName="ContainerImageTag" />
+        </ParseContainerProperties>
+    </Target>
+    <!-- Aftertargets: Any time you run X, then run this target. -->
+    <!-- Beforetargets =publish here effectively means going over to publish and setting its dependsontargets=publishcontainers. -->
+    <!-- BeforeTargets and AfterTargets happen "each time" that target runs -->
+    <Target Name="PublishContainer" DependsOnTargets="$(PublishContainerDependsOn)">
+        <CreateNewImage BaseRegistry="$(ContainerBaseRegistry)"
+                        BaseImageName="$(ContainerBaseName)"
+                        BaseImageTag="$(ContainerBaseTag)"
+                        OutputRegistryURL="$(ContainerRegistry)"
                         PublishDirectory="$(MSBuildProjectDirectory)\$(PublishDir)"
+                        NewImageName="$(NewImageName)"
+                        NewImageTag="$(NewImageTag)"
                         WorkingDirectory="$(ContainerWorkingDirectory)"
-                        NewImageName="$(ContainerImageName)"
                         Entrypoint="$(ContainerEntrypoint)"
                         EntrypointArgs="$(ContainerEntrypointArgs)"/>
     </Target>

@@ -11,7 +11,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Test.System.Containers.File
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "containerize", "containerize\containerize.csproj", "{151F7937-D2AF-4242-9B6D-81FD5228D132}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "System.Containers.Tasks", "System.Containers.Tasks\System.Containers.Tasks.csproj", "{1CA8810B-8582-478E-A1E6-C9C7D53D8004}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "System.Containers.Tasks", "System.Containers.Tasks\System.Containers.Tasks.csproj", "{1CA8810B-8582-478E-A1E6-C9C7D53D8004}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

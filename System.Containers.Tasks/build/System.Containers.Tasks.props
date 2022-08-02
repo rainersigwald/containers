@@ -8,7 +8,8 @@
         <CustomTasksAssembly>$(CustomTasksFolder)\$(MSBuildThisFileName).dll</CustomTasksAssembly>
     </PropertyGroup>
 
- <!--Register our custom task-->
+    <!--Register our custom task-->
     <UsingTask TaskName="$(MSBuildThisFileName).CreateNewImage" AssemblyFile="$(CustomTasksAssembly)"/>
+    <UsingTask TaskName="$(MSBuildThisFileName).ParseContainerProperties" AssemblyFile="$(CustomTasksAssembly)"/>
 
 </Project>

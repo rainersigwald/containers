@@ -14,16 +14,22 @@ namespace System.Containers.Tasks
     public class CreateNewImage : Microsoft.Build.Utilities.Task
     {
         /// <summary>
-        /// Base image name.
+        /// Ex: mcr.microsoft.com
+        /// </summary>
+        [Required]
+        public string BaseRegistry { get; set; }
+
+        /// <summary>
+        /// Ex: dotnet/runtime
         /// </summary>
         [Required]
         public string BaseImageName { get; set; }
 
+        /// <summary>
+        /// Ex: 6.0
+        /// </summary>
         [Required]
         public string BaseImageTag { get; set; }
-
-        [Required]
-        public string InputRegistryURL { get; set; }
 
         [Required]
         public string OutputRegistryURL { get; set; }
@@ -64,11 +70,24 @@ namespace System.Containers.Tasks
         {
             if (string.IsNullOrEmpty(PublishDirectory) || !Directory.Exists(PublishDirectory))
             {
-                Log.LogError("PublishDirectory and Files are both invalid. One valid parameter MUST be given to the CreateNewImage task.");
-                return false;
+                Log.LogError(string.Format("PublishDirectory is either null or doesn't exist invalid. IsNullOrEmpty: {0}, Exists: {1}", string.IsNullOrEmpty(PublishDirectory), Directory.Exists(PublishDirectory)));
+                return !Log.HasLoggedErrors;
             }
 
-            Registry reg = new Registry(new Uri(InputRegistryURL));
+            Registry reg;
+
+            try
+            {
+                reg = new Registry(new Uri(BaseRegistry, UriKind.RelativeOrAbsolute));
+            }
+            catch (Exception e)
+            {
+                if (BuildEngine != null)
+                {
+                    Log.LogError("Failed initializing the registry: {0}", e.Message);
+                }
+                return !Log.HasLoggedErrors;
+            }
 
             Image image;
             try
@@ -77,11 +96,17 @@ namespace System.Containers.Tasks
             }
             catch (Exception ex)
             {
-                Log.LogError("GetImageManifest Failed: {0}.\n{1}", ex.Message, ex.InnerException);
-                return false;
+                if (BuildEngine != null)
+                {
+                    Log.LogError("Failed getting image manifest: {0}.", ex.Message);
+                }
+                return !Log.HasLoggedErrors;
             }
 
-            Log.LogMessage($"Loading from directory: {PublishDirectory}");
+            if (BuildEngine != null)
+            {
+                Log.LogMessage($"Loading from directory: {PublishDirectory}");
+            }
             Layer newLayer = Layer.FromDirectory(PublishDirectory, WorkingDirectory);
             image.AddLayer(newLayer);
 
@@ -95,11 +120,14 @@ namespace System.Containers.Tasks
             }
             catch (Exception e)
             {
-                Log.LogError("Failed to push to the output registry: {0}\n{1}", e.Message, e.InnerException);
-                return false;
+                if (BuildEngine != null)
+                {
+                    Log.LogError("Failed to push to the output registry: {0}", e.Message);
+                }
+                return !Log.HasLoggedErrors;
             }
 
-            return true;
+            return !Log.HasLoggedErrors;
         }
     }
 }
