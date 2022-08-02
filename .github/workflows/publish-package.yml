@@ -1,0 +1,22 @@
+name: Publish Package
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: |
+          6.0.x
+          7.0.100-preview.6.22352.1
+    - name: Release
+      run: dotnet build --configuration release
+    - name: Publish
+      run: dotnet nuget push "System.Containers.Tasks/bin/release/System.Containers.Tasks.*.nupkg" --api-key ${{ secrets.GITHUB_TOKEN }}
